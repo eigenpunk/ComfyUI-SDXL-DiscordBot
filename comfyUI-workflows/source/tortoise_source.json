@@ -1,0 +1,380 @@
+{
+  "last_node_id": 105,
+  "last_link_id": 11,
+  "nodes": [
+    {
+      "id": 76,
+      "type": "SpectrogramImage",
+      "pos": [
+        1759.2000122070312,
+        130
+      ],
+      "size": {
+        "0": 315,
+        "1": 178
+      },
+      "flags": {},
+      "order": 4,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "audio",
+          "type": "AUDIO_TENSOR",
+          "link": 3
+        }
+      ],
+      "outputs": [
+        {
+          "name": "IMAGE",
+          "type": "IMAGE",
+          "links": [
+            4
+          ],
+          "shape": 3
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "SpectrogramImage"
+      },
+      "widgets_values": [
+        1024,
+        256,
+        1024,
+        0.5,
+        true,
+        true
+      ]
+    },
+    {
+      "id": 91,
+      "type": "ConvertAudio",
+      "pos": [
+        1015,
+        130
+      ],
+      "size": [
+        315,
+        106
+      ],
+      "flags": {},
+      "order": 2,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "audio",
+          "type": "AUDIO_TENSOR",
+          "link": 6
+        },
+        {
+          "name": "from_rate",
+          "type": "INT",
+          "link": 8,
+          "widget": {
+            "name": "from_rate"
+          }
+        }
+      ],
+      "outputs": [
+        {
+          "name": "AUDIO_TENSOR",
+          "type": "AUDIO_TENSOR",
+          "links": [
+            5
+          ],
+          "shape": 3
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "ConvertAudio"
+      },
+      "widgets_values": [
+        44100,
+        44100,
+        1
+      ]
+    },
+    {
+      "id": 104,
+      "type": "TortoiseTTSGenerate",
+      "pos": [
+        515,
+        130
+      ],
+      "size": {
+        "0": 400,
+        "1": 508
+      },
+      "flags": {},
+      "order": 1,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "model",
+          "type": "TORTOISE_TTS",
+          "link": 7
+        }
+      ],
+      "outputs": [
+        {
+          "name": "RAW_AUDIO",
+          "type": "AUDIO_TENSOR",
+          "links": [
+            6
+          ],
+          "shape": 3
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "TortoiseTTSGenerate"
+      },
+      "widgets_values": [
+        "random",
+        "hello world",
+        1,
+        "global",
+        8,
+        8,
+        0.3,
+        2,
+        4,
+        0.8,
+        300,
+        0.7000000000000001,
+        10,
+        true,
+        2,
+        1,
+        "ddim",
+        947,
+        "randomize"
+      ]
+    },
+    {
+      "id": 83,
+      "type": "Image Resize",
+      "pos": [
+        2174.2000122070312,
+        130
+      ],
+      "size": {
+        "0": 315,
+        "1": 178
+      },
+      "flags": {},
+      "order": 5,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "image",
+          "type": "IMAGE",
+          "link": 4
+        }
+      ],
+      "outputs": [
+        {
+          "name": "IMAGE",
+          "type": "IMAGE",
+          "links": [
+            9
+          ],
+          "shape": 3,
+          "slot_index": 0
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "Image Resize"
+      },
+      "widgets_values": [
+        "resize",
+        "true",
+        "bicubic",
+        2,
+        512,
+        128
+      ]
+    },
+    {
+      "id": 93,
+      "type": "TortoiseTTSLoader",
+      "pos": [
+        100,
+        130
+      ],
+      "size": {
+        "0": 315,
+        "1": 102
+      },
+      "flags": {},
+      "order": 0,
+      "mode": 0,
+      "outputs": [
+        {
+          "name": "MODEL",
+          "type": "TORTOISE_TTS",
+          "links": [
+            7
+          ],
+          "shape": 3
+        },
+        {
+          "name": "SR",
+          "type": "INT",
+          "links": [
+            8
+          ],
+          "shape": 3,
+          "slot_index": 1
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "TortoiseTTSLoader"
+      },
+      "widgets_values": [
+        true,
+        false
+      ]
+    },
+    {
+      "id": 89,
+      "type": "ApplyVoiceFixer",
+      "pos": [
+        1460,
+        130
+      ],
+      "size": [
+        167.98996322631865,
+        26
+      ],
+      "flags": {},
+      "order": 3,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "audio",
+          "type": "AUDIO_TENSOR",
+          "link": 5
+        }
+      ],
+      "outputs": [
+        {
+          "name": "AUDIO_TENSOR",
+          "type": "AUDIO_TENSOR",
+          "links": [
+            3,
+            10
+          ],
+          "shape": 3,
+          "slot_index": 0
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "ApplyVoiceFixer"
+      }
+    },
+    {
+      "id": 105,
+      "type": "CombineImageWithAudio",
+      "pos": [
+        2550,
+        130
+      ],
+      "size": [
+        315,
+        126
+      ],
+      "flags": {},
+      "order": 6,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "image",
+          "type": "IMAGE",
+          "link": 9
+        },
+        {
+          "name": "audio",
+          "type": "AUDIO_TENSOR",
+          "link": 10
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "CombineImageWithAudio"
+      },
+      "widgets_values": [
+        44100,
+        "webm",
+        "final_output"
+      ]
+    }
+  ],
+  "links": [
+    [
+      3,
+      89,
+      0,
+      76,
+      0,
+      "AUDIO_TENSOR"
+    ],
+    [
+      4,
+      76,
+      0,
+      83,
+      0,
+      "IMAGE"
+    ],
+    [
+      5,
+      91,
+      0,
+      89,
+      0,
+      "AUDIO_TENSOR"
+    ],
+    [
+      6,
+      104,
+      0,
+      91,
+      0,
+      "AUDIO_TENSOR"
+    ],
+    [
+      7,
+      93,
+      0,
+      104,
+      0,
+      "TORTOISE_TTS"
+    ],
+    [
+      8,
+      93,
+      1,
+      91,
+      1,
+      "INT"
+    ],
+    [
+      9,
+      83,
+      0,
+      105,
+      0,
+      "IMAGE"
+    ],
+    [
+      10,
+      89,
+      0,
+      105,
+      1,
+      "AUDIO_TENSOR"
+    ]
+  ],
+  "groups": [],
+  "config": {},
+  "extra": {},
+  "version": 0.4
+}

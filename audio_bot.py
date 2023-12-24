@@ -73,10 +73,10 @@ async def speech_command(
     )
     await do_request(
         interaction,
+        f'{interaction.user.mention} wants to speak, this shouldn\'t take too long...',
+        f'{interaction.user.mention} said "{prompt}".',
         "speech",
         params,
-        f'{interaction.user.mention} wants to speak, this shouldn\'t take too long...',
-        f'{interaction.user.mention} said "{prompt}".'
     )
 
 async def do_request(

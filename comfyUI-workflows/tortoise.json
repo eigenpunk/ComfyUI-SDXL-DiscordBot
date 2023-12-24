@@ -1,19 +1,4 @@
 {
-  "58": {
-    "inputs": {
-      "sr": 44100,
-      "filename_prefix": "final_output",
-      "image": [
-        "83",
-        0
-      ],
-      "audio": [
-        "89",
-        0
-      ]
-    },
-    "class_type": "CombineImageWithAudio"
-  },
   "76": {
     "inputs": {
       "n_fft": 1024,
@@ -78,7 +63,7 @@
   "104": {
     "inputs": {
       "voice": "random",
-      "text": "hello world!",
+      "text": "hello world",
       "batch_size": 1,
       "latent_averaging_mode": "global",
       "num_autoregressive_samples": 8,
@@ -94,12 +79,28 @@
       "cond_free_k": 2,
       "diffusion_temperature": 1,
       "sampler": "ddim",
-      "seed": 1366,
+      "seed": 947,
       "model": [
         "93",
         0
       ]
     },
     "class_type": "TortoiseTTSGenerate"
+  },
+  "105": {
+    "inputs": {
+      "sr": 44100,
+      "file_format": "webm",
+      "filename_prefix": "final_output",
+      "image": [
+        "83",
+        0
+      ],
+      "audio": [
+        "89",
+        0
+      ]
+    },
+    "class_type": "CombineImageWithAudio"
   }
 }

@@ -17,7 +17,7 @@ class AudioButtons(discord.ui.View):
         self.sound_fnames = sound_fnames
         self.command = command
 
-        if command == "speak":
+        if command == "speech":
             return
 
         for i in range(len(sound_fnames)):

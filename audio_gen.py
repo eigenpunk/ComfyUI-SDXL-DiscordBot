@@ -117,8 +117,8 @@ async def generate_audio(params: AudioWorkflow):
     await generator.close()
 
     clips = images["clips"]
-    clips, clip_fnames = zip(*clips)
+    clips, clip_fnames = zip(*clips) if len(clips) else ((), ())
     videos = images["videos"]
-    videos, video_fnames = zip(*videos)
+    videos, video_fnames = zip(*videos) if len(videos) else ((), ())
 
     return (clips, videos, clip_fnames), enhanced_prompt
