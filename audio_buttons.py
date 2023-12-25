@@ -49,7 +49,7 @@ class AudioButtons(discord.ui.View):
         params.snd_filename = None  # params.snd_filename[index]
         params.vid_filename = None
 
-        modal = AudioEditModal(params, "edit")
+        modal = AudioEditModal(params, self.command)
         await interaction.response.send_modal(modal)
 
     async def extend(self, interaction, button):
@@ -61,7 +61,7 @@ class AudioButtons(discord.ui.View):
         params.snd_filename = self.sound_fnames[index]
         params.vid_filename = None
 
-        modal = AudioEditModal(params, "extend")
+        modal = AudioEditModal(params, self.command)
         await interaction.response.send_modal(modal)
 
     @discord.ui.button(label="Info", style=discord.ButtonStyle.blurple, emoji="ℹ️", row=0)
@@ -85,14 +85,9 @@ class AudioEditModal(ui.Modal, title="Edit/Extend Sound"):
         self.prompt = ui.TextInput(
             label="Prompt",
             placeholder="Enter a prompt",
-            max_length=256,
+            max_length=2048,
             required=False,
             default=self.params.prompt or ""
-        )
-        self.cfg = ui.TextInput(
-            label="Guidance Scale",
-            placeholder="Controls audio's conformance to text prompt; default 3.0",
-            default=str(self.params.cfg)
         )
         self.temperature = ui.TextInput(
             label="Temperature",
@@ -101,20 +96,25 @@ class AudioEditModal(ui.Modal, title="Edit/Extend Sound"):
         )
         self.top_p = ui.TextInput(
             label="Top p",
-            placeholder="",
             default=str(self.params.top_p)
-        )
-        self.top_k = ui.TextInput(
-            label="Top k",
-            placeholder="Number of tokens to ",
-            default=str(self.params.top_k)
         )
 
         self.add_item(self.prompt)
-        self.add_item(self.cfg)
         self.add_item(self.temperature)
         self.add_item(self.top_p)
-        self.add_item(self.top_k)
+
+        if self.command == "music":
+            self.top_k = ui.TextInput(
+                label="Top k",
+                default=str(self.params.top_k)
+            )
+            self.cfg = ui.TextInput(
+                label="Guidance Scale",
+                placeholder="Controls audio's conformance to text prompt; default 3.0",
+                default=str(self.params.cfg)
+            )
+            self.add_item(self.top_k)
+            self.add_item(self.cfg)
 
     async def on_submit(self, interaction: discord.Interaction) -> None:
         await interaction.response.send_message("Generating audio with new parameters, this shouldn't take too long...")
@@ -122,10 +122,13 @@ class AudioEditModal(ui.Modal, title="Edit/Extend Sound"):
         params = deepcopy(self.params)
         try:
             params.prompt = self.prompt.value
-            params.cfg = float(self.cfg.value)
             params.temperature = float(self.temperature.value)
             params.top_p = float(self.top_p.value)
-            params.top_k = int(self.top_k.value)
+
+            if self.command == "music":
+                params.top_k = int(self.top_k.value)
+                params.cfg = float(self.cfg.value)
+
         except ValueError:
             interaction.response.send_message(
                 "An error occurred while parsing a value you entered. Please check your inputs and try your request again.",
@@ -137,8 +140,7 @@ class AudioEditModal(ui.Modal, title="Edit/Extend Sound"):
 
         (_, videos, sound_fnames), _ = await generate_audio(params)
 
-        verbed = "extended" if self.command == "extend" else "remixed"
-        final_message = f"{interaction.user.mention} here is your {verbed} audio"
+        final_message = f"{interaction.user.mention} here is your audio"
         buttons = AudioButtons(params, sound_fnames, command=self.command)
 
         files = [discord.File(fp=BytesIO(v), filename=f"sound_{i}.webm") for i, v in enumerate(videos)]
