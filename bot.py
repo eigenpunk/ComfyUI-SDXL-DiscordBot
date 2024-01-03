@@ -1,8 +1,10 @@
+import json
 import logging
 import random
-
+import os
 import discord
-from discord import app_commands
+
+from discord import app_commands, Attachment
 from discord.app_commands import Choice, Range
 
 from buttons import Buttons
@@ -26,12 +28,12 @@ from util import (
     setup_config,
     should_filter,
     unpack_choices,
+    get_filename,
+    process_attachment,
 )
-
 
 discord.utils.setup_logging()
 logger = logging.getLogger("bot")
-
 
 # setting up the bot
 TOKEN = setup_config()
@@ -43,6 +45,9 @@ models = get_models()
 loras = get_loras()
 samplers = get_samplers()
 
+generation_messages = json.loads(open("generation_messages.json", "r").read())
+completion_messages = json.loads(open("completion_messages.json", "r").read())
+
 # These aspect ratio resolution values correspond to the SDXL Empty Latent Image node.
 # A latent modification node in the workflow converts it to the equivalent SD 1.5 resolution values.
 ASPECT_RATIO_CHOICES = [
@@ -52,10 +57,11 @@ ASPECT_RATIO_CHOICES = [
     Choice(name="9:7 landscape", value="1152 x 896   (landscape)"),
     Choice(name="7:4 landscape", value="1344 x 768   (landscape)"),
 ]
-SD15_MODEL_CHOICES = [Choice(name=m, value=m) for m in models[0] if "xl" not in m.lower()][:25]
-SD15_LORA_CHOICES = [Choice(name=l, value=l) for l in loras[0] if "xl" not in l.lower()][:25]
-SDXL_MODEL_CHOICES = [Choice(name=m, value=m) for m in models[0] if "xl" in m.lower() and "refiner" not in m.lower()][:25]
-SDXL_LORA_CHOICES = [Choice(name=l, value=l) for l in loras[0] if "xl" in l.lower()][:25]
+SD15_MODEL_CHOICES = [Choice(name=m.replace(".safetensors", ""), value=m) for m in models[0] if "xl" not in m.lower()][:25]
+SD15_LORA_CHOICES = [Choice(name=l.replace(".safetensors", ""), value=l) for l in loras[0] if "xl" not in l.lower()][:25]
+SDXL_MODEL_CHOICES = [Choice(name=m.replace(".safetensors", ""), value=m) for m in models[0] if "xl" in m.lower() and "refiner" not in m.lower()][
+                     :25]
+SDXL_LORA_CHOICES = [Choice(name=l.replace(".safetensors", ""), value=l) for l in loras[0] if "xl" in l.lower()][:25]
 SAMPLER_CHOICES = [Choice(name=s, value=s) for s in samplers[0]]
 
 BASE_ARG_DESCS = {
@@ -69,8 +75,17 @@ BASE_ARG_DESCS = {
     "num_steps": f"Number of sampling steps; range [1, {MAX_STEPS}]",
     "cfg_scale": f"Degree to which AI should follow prompt; range [1.0, {MAX_CFG}]",
 }
-IMAGINE_ARG_DESCS = {**BASE_ARG_DESCS, "num_steps": "Number of sampling steps; range [1, 30]"}
-SDXL_ARG_DESCS = BASE_ARG_DESCS
+IMAGINE_ARG_DESCS = {
+    **BASE_ARG_DESCS,
+    "num_steps": "Number of sampling steps; range [1, 30]",
+    "input_file": "Image to use as input for img2img",
+    "denoise_strength": f"Strength of denoising filter during img2img. Only works when input_file is set; range [0.01, 1.0], default {SD15_GENERATION_DEFAULTS.denoise_strength}"
+}
+SDXL_ARG_DESCS = {
+    **BASE_ARG_DESCS,
+    "input_file": "Image to use as input for img2img",
+    "denoise_strength": f"Strength of denoising filter during img2img. Only works when input_file is set; range [0.01, 1.0], default {SDXL_GENERATION_DEFAULTS.denoise_strength}"
+}
 VIDEO_ARG_DESCS = {k: v for k, v in BASE_ARG_DESCS.items() if k != "aspect_ratio"}
 
 BASE_ARG_CHOICES = {
@@ -126,9 +141,16 @@ async def slash_command(
         num_steps: Range[int, 1, MAX_STEPS] = None,
         cfg_scale: Range[float, 1.0, MAX_CFG] = None,
         seed: int = None,
+        input_file: Attachment = None,
+        denoise_strength: Range[float, 0.01, 1.0] = None
 ):
+    if input_file is not None:
+        fp = await process_attachment(input_file, interaction)
+        if fp is None:
+            return
+
     params = ImageWorkflow(
-        SD15_WORKFLOW,
+        SD15_WORKFLOW if input_file is None else SD15_ALTS_WORKFLOW,
         prompt,
         negative_prompt,
         model or SD15_GENERATION_DEFAULTS.model,
@@ -139,11 +161,14 @@ async def slash_command(
         num_steps or SD15_GENERATION_DEFAULTS.num_steps,
         cfg_scale or SD15_GENERATION_DEFAULTS.cfg_scale,
         seed=seed,
+        slash_command="imagine",
+        filename=fp if input_file is not None else None,
+        denoise_strength=denoise_strength or SD15_GENERATION_DEFAULTS.denoise_strength
     )
     await do_request(
         interaction,
-        f'{interaction.user.mention} asked me to imagine "{prompt}", this shouldn\'t take too long...',
-        f'{interaction.user.mention} asked me to imagine "{prompt}", here is what I imagined for them.',
+        f'🖼️ {interaction.user.mention} asked me to imagine "{prompt}"! {random.choice(generation_messages)} 🖼️',
+        f'{interaction.user.mention} asked me to imagine "{prompt}"! {random.choice(completion_messages)}',
         "imagine",
         params,
     )
@@ -178,11 +203,12 @@ async def slash_command(
         num_steps=num_steps or VIDEO_GENERATION_DEFAULTS.num_steps,
         cfg_scale=cfg_scale or VIDEO_GENERATION_DEFAULTS.cfg_scale,
         seed=seed,
+        slash_command="video",
     )
     await do_request(
         interaction,
-        f'{interaction.user.mention} asked me to create the video "{prompt}", this shouldn\'t take too long...',
-        f'{interaction.user.mention} asked me to create the video "{prompt}", here is what I created for them.',
+        f'🎥{interaction.user.mention} asked me to create the video "{prompt}"! {random.choice(generation_messages)} 🎥',
+        f'{interaction.user.mention} asked me to create the video "{prompt}"! {random.choice(completion_messages)} 🎥',
         "video",
         params,
     )
@@ -205,9 +231,16 @@ async def slash_command(
         num_steps: Range[int, 1, MAX_STEPS] = None,
         cfg_scale: Range[float, 1.0, MAX_CFG] = None,
         seed: int = None,
+        input_file: Attachment = None,
+        denoise_strength: Range[float, 0.01, 1.0] = None
 ):
+    if input_file is not None:
+        fp = await process_attachment(input_file, interaction)
+        if fp is None:
+            return
+
     params = ImageWorkflow(
-        SDXL_WORKFLOW,
+        SDXL_WORKFLOW if input_file is None else SDXL_ALTS_WORKFLOW,
         prompt,
         negative_prompt,
         model or SDXL_GENERATION_DEFAULTS.model,
@@ -218,11 +251,14 @@ async def slash_command(
         num_steps=num_steps or SDXL_GENERATION_DEFAULTS.num_steps,
         cfg_scale=cfg_scale or SDXL_GENERATION_DEFAULTS.cfg_scale,
         seed=seed,
+        slash_command="sdxl",
+        filename=fp if input_file is not None else None,
+        denoise_strength=denoise_strength or SDXL_GENERATION_DEFAULTS.denoise_strength
     )
     await do_request(
         interaction,
-        f'{interaction.user.mention} asked me to imagine "{prompt}", this shouldn\'t take too long...',
-        f'{interaction.user.mention} asked me to imagine "{prompt}", here is what I imagined for them.',
+        f'🖌️{interaction.user.mention} asked me to imagine "{prompt}" using SDXL! {random.choice(generation_messages)} 🖌️',
+        f'🖌️ {interaction.user.mention} asked me to imagine "{prompt}" using SDXL! {random.choice(completion_messages)}. 🖌️',
         "sdxl",
         params,
     )
@@ -257,7 +293,10 @@ async def do_request(
 
     final_message = f"{completion_message}\n Seed: {params.seed}"
     buttons = Buttons(params, images, interaction.user, command=command_name)
-    fname = "collage.gif" if "GIF" in images[0].format else "collage.png"
+
+    file_name = get_filename(interaction, params)
+
+    fname = f"{file_name}.gif" if "GIF" in images[0].format else f"{file_name}.png"
     await interaction.channel.send(
         content=final_message, file=discord.File(fp=create_collage(images), filename=fname), view=buttons
     )
@@ -272,14 +311,15 @@ async def on_ready():
 
 
 if c := read_config():
-    if c["BOT"]["MUSIC_ENABLED"]:
+    if c["BOT"]["MUSIC_ENABLED"].lower() == "true":
         from audio_bot import music_command
+
         tree.add_command(music_command)
 
-    if c["BOT"]["SPEECH_ENABLED"]:
+    if c["BOT"]["SPEECH_ENABLED"].lower() == "true":
         from audio_bot import speech_command
-        tree.add_command(speech_command)
 
+        tree.add_command(speech_command)
 
 # run the bot
 client.run(TOKEN, log_handler=None)

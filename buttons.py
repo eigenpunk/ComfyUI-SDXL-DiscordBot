@@ -3,12 +3,13 @@ from copy import deepcopy
 from datetime import datetime
 
 import discord
+import discord.ext
 from discord import ui
 
 from imageGen import ImageWorkflow, generate_images, upscale_image, generate_alternatives
 from collage_utils import create_collage, create_gif_collage
 from consts import *
-from util import should_filter
+from util import should_filter, get_filename, build_command
 
 
 class ImageButton(discord.ui.Button):
@@ -63,6 +64,13 @@ class Buttons(discord.ui.View):
             btn = ImageButton(f"U{idx + 1}", "⬆️", row, self.upscale_and_send)
             self.add_item(btn)
 
+        # Dynamically add download buttons
+        for idx, _ in enumerate(images):
+            # Determine row based on index, number of alternative buttons, and re-roll row
+            row = (idx + (len(images) * 2) + 2) // 5 + reroll_row
+            btn = ImageButton(f"D{idx + 1}", "💾", row, self.download_image)
+            self.add_item(btn)
+
         # removed until the upscale flow is fixed
         # Add upscale with added detail buttons
         # for idx, _ in enumerate(images):
@@ -72,7 +80,7 @@ class Buttons(discord.ui.View):
 
     async def generate_alternatives_and_send(self, interaction, button):
         index = int(button.label[1:]) - 1  # Extract index from label
-        await interaction.response.send_message("Creating some alternatives, this shouldn't take too long...")
+        await interaction.response.send_message(f"{interaction.user.mention} asked for some alternatives of image #{index + 1}, this shouldn't take too long...")
 
         params = deepcopy(self.params)
         params.workflow_name = SDXL_ALTS_WORKFLOW if self.is_sdxl else SD15_ALTS_WORKFLOW
@@ -94,7 +102,7 @@ class Buttons(discord.ui.View):
 
     async def upscale_and_send(self, interaction, button):
         index = int(button.label[1:]) - 1  # Extract index from label
-        await interaction.response.send_message("Upscaling the image, this shouldn't take too long...")
+        await interaction.response.send_message(f"{interaction.user.mention} asked for an upscale of image #{index + 1}, this shouldn't take too long...")
 
         params = deepcopy(self.params)
         params.workflow_name = UPSCALE_WORKFLOW
@@ -104,9 +112,10 @@ class Buttons(discord.ui.View):
         upscaled_image.save(upscaled_image_path)
         final_message = f"{interaction.user.mention} here is your upscaled image"
         buttons = AddDetailButtons(params, upscaled_image, is_sdxl=self.is_sdxl)
+        fp = f"{get_filename(interaction, self.params)}_{index}.png"
         await interaction.channel.send(
             content=final_message,
-            file=discord.File(fp=upscaled_image_path, filename="upscaled_image.png"),
+            file=discord.File(fp=upscaled_image_path, filename=fp),
             view=buttons
         )
 
@@ -191,8 +200,18 @@ class Buttons(discord.ui.View):
             f"num steps: {params.num_steps or 'default'}\n"
             f"cfg scale: {params.cfg_scale or 'default'}\n"
             f"seed: {params.seed}\n"
+            f"```{build_command(params)}```"
         )
         await interaction.response.send_message(info_str, ephemeral=True)
+
+    async def download_image(self, interaction, button):
+        index = int(button.label[1:]) - 1
+        file_name = f"{get_filename(interaction, self.params)}_{index}.png"
+        fp = f"./out/images_{file_name}"
+        self.images[index].save(fp)
+        await interaction.response.send_message(f"{interaction.user.mention}, here is your image!",
+                                                file=discord.File(fp=fp, filename=file_name)
+                                                )
 
 
 class AddDetailButtons(discord.ui.View):
@@ -212,12 +231,17 @@ class AddDetailButtons(discord.ui.View):
         params.workflow_name = SDXL_DETAIL_WORKFLOW if self.is_sdxl else SD15_DETAIL_WORKFLOW
         params.denoise_strength = None
         params.seed = random.randint(0, 999999999999999)
+        params.batch_size = 1
 
         images = await generate_alternatives(params, self.images)
         collage_path = create_collage(images)
         final_message = f"{interaction.user.mention} here is your image with more detail"
 
-        await interaction.channel.send(content=final_message, file=discord.File(fp=collage_path, filename="collage.png"))
+        fp = f"{get_filename(interaction, self.params)}_detail.png"
+
+        await interaction.channel.send(content=final_message,
+                                       file=discord.File(fp=collage_path, filename=fp)
+                                       )
 
 
 class EditModal(ui.Modal, title="Edit Image"):
@@ -316,8 +340,5 @@ class EditModal(ui.Modal, title="Edit Image"):
         if self.seed.value != None and self.seed.value != "" and int(self.seed.value) > 1 << 50:
             await self.on_error(interaction, Exception("Seed must be less than 2^50"))
             return False
-        
-        if should_filter(self.prompt.value, self.negative_prompt.value):
-            await self.on_error(interaction, Exception("Blocked word(s) in prompt"))
 
         return True
